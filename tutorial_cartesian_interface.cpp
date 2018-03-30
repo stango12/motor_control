@@ -62,7 +62,10 @@ protected:
     Vector x_notes;
     Vector y_notes;
 
+    Vector command;
+
     int startup_context_id;
+    int run_mode;
 
     double t;
     double t0;
@@ -149,7 +152,7 @@ public:
         int nj=0;
         movePos->getAxes(&nj);
         Vector encoders;
-        Vector command;
+        
         Vector tmp;
         encoders.resize(nj);
         tmp.resize(nj);
@@ -209,7 +212,7 @@ public:
             Time::delay(0.1);
         }
 
-        robotDevice.close();
+        //robotDevice.close();
 
         // open the view
         client.view(icart);
@@ -274,12 +277,14 @@ public:
         y_notes.resize(12);
 
         icart->getPose(home, home_od);
+        fprintf(stdout,"home position = %s\n",home.toString().c_str());
+        fprintf(stdout,"home angle = %s\n",home_od.toString().c_str());
 
         // home[0]=-0.25;
         // home[1]=0.2;
         // home[2]=+0.2;
 
-        tableHeight = 0.1;
+        tableHeight = 0.16;
 
         // goHome();
         // icart->goToPoseSync(xd,od);
@@ -288,6 +293,7 @@ public:
         //middle c caused last two notes to be unreachable?
         cout << "(Wait until finger movement is finished)" << endl;
         cout << "Line up F with middle finger in this position. Enter any character to continue." << endl;
+        cout << "Table height is "  << tableHeight << "Z=0 around 65cm?" << endl;
         cin >> ack; 
         
         white_white_y=0.0225;
@@ -348,6 +354,10 @@ public:
         y_notes[11]=y_notes[10] + small_white_black_y;
 
         index = 0;
+
+        cout << "Run runmode 0(Cartesian) or 1(Motor)?" << endl;
+        cin >> ack;
+        run_mode = ack - '0';
         return true;
     }
 
@@ -380,35 +390,79 @@ public:
         test[11]=1;
         t=Time::now();
 
-        generateTarget(test[index]);
+        if(run_mode == 0)
+        {
+            generateTarget(test[index]);
 
-        // go to the target 
-        cout << "Going to this note: " << test[index] << endl;
-        icart->goToPoseSync(xd,od);
-        icart->waitMotionDone(0.04);
-        icart->askForPose(xd,od, xdhat, odhat, armPos);
-        fprintf(stdout,"armPos = %s\n",armPos.toString().c_str());
-        cout << "Continue?" << endl;
-        cin >> ack;
+            // go to the target 
+            cout << "Going to this note: " << test[index] << endl;
+            icart->goToPoseSync(xd,od);
+            icart->waitMotionDone(0.04);
+            icart->askForPose(xd,od, xdhat, odhat, armPos);
+            fprintf(stdout,"armPos = %s\n",armPos.toString().c_str());
+            cout << "Continue?" << endl;
+            cin >> ack;
 
-        //go down
-        xd[2] = tableHeight;
-        icart->goToPoseSync(xd,od);
-        icart->waitMotionDone(0.04);
-        icart->askForPose(xd,od, xdhat, odhat, armPos);
-        fprintf(stdout,"armPos = %s\n",armPos.toString().c_str());
-        cout << "Continue?" << endl;
-        cin >> ack;
+            //go down
+            xd[2] = tableHeight;
+            icart->goToPoseSync(xd,od);
+            icart->waitMotionDone(0.04);
+            icart->askForPose(xd,od, xdhat, odhat, armPos);
+            fprintf(stdout,"armPos = %s\n",armPos.toString().c_str());
+            cout << "Continue?" << endl;
+            cin >> ack;
 
-        //back up
-        xd[2] = home[2];
-        icart->goToPoseSync(xd,od);
-        icart->waitMotionDone(0.04);
-        icart->askForPose(xd,od, xdhat, odhat, armPos);
-        fprintf(stdout,"armPos = %s\n",armPos.toString().c_str());
-        cout << "Continue?" << endl;
-        cin >> ack;
+            //back up
+            xd[2] = home[2];
+            icart->goToPoseSync(xd,od);
+            icart->waitMotionDone(0.04);
+            icart->askForPose(xd,od, xdhat, odhat, armPos);
+            fprintf(stdout,"armPos = %s\n",armPos.toString().c_str());
+            cout << "Continue?" << endl;
+            cin >> ack;
+        }
+        else
+        {
+            generateTarget(test[index], "up");
+            cout << "Going to this note: " << test[index] << endl;
+            movePos->positionMove(command.data());
+            
+            bool done=false;
 
+            while(!done)
+            {
+                movePos->checkMotionDone(&done);
+                Time::delay(0.1);
+            }
+            cout << "Continue?" << endl;
+            cin >> ack;
+
+            generateTarget(test[index], "down");
+            movePos->positionMove(command.data());
+            
+            done=false;
+
+            while(!done)
+            {
+                movePos->checkMotionDone(&done);
+                Time::delay(0.1);
+            }
+            cout << "Continue?" << endl;
+            cin >> ack;
+
+            generateTarget(test[index], "up");
+            movePos->positionMove(command.data());
+            
+            done=false;
+
+            while(!done)
+            {
+                movePos->checkMotionDone(&done);
+                Time::delay(0.1);
+            }
+            cout << "Continue?" << endl;
+            cin >> ack;
+        }
         index++;
         if(index == 12)
             index = 0;
@@ -445,6 +499,288 @@ public:
         // to achieve that it is enough to rotate the root frame of pi around z-axis
         //od[0]=0.0; od[1]=1.0; od[2]=0.0; od[3]=M_PI;
         od = home_od;
+    }
+
+    void generateTarget(int i, string s)
+    {
+        switch(i)
+        {
+            case 0:
+                if(s == "up")
+                {
+                    command[0]=-20;
+                    command[1]=80;
+                    command[2]=17;
+                    command[3]=100;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=27;
+                }
+                if(s == "down")
+                {
+                    command[0]=-8;
+                    command[1]=71;
+                    command[2]=9;
+                    command[3]=100;
+                    command[4]=29;
+                    command[5]=-2;
+                    command[6]=25;
+                }
+                break;
+            case 1:
+                if(s == "up")
+                {
+                    command[0]=-62;
+                    command[1]=72;
+                    command[2]=58;
+                    command[3]=78;
+                    command[4]=22;
+                    command[5]=-2;
+                    command[6]=17;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=-52;
+                    command[1]=73;
+                    command[2]=59;
+                    command[3]=78;
+                    command[4]=22;
+                    command[5]=-13;
+                    command[6]=19;
+                }
+                break;
+            case 2:
+                if(s == "up")
+                {
+                    command[0]=-10;
+                    command[1]=80;
+                    command[2]=5;
+                    command[3]=93;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=19;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=-3;
+                    command[1]=70;
+                    command[2]=1;
+                    command[3]=94;
+                    command[4]=29;
+                    command[5]=-3;
+                    command[6]=16;
+                }
+                break;
+            case 3:
+                if(s == "up")
+                {
+                    command[0]=-67;
+                    command[1]=74;
+                    command[2]=63;
+                    command[3]=67;
+                    command[4]=19;
+                    command[5]=-6;
+                    command[6]=7;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=-56;
+                    command[1]=75;
+                    command[2]=63;
+                    command[3]=68;
+                    command[4]=17;
+                    command[5]=-16;
+                    command[6]=8;   
+                }
+                break;
+            case 4:
+                if(s == "up")
+                {
+                    command[0]=-6;
+                    command[1]=79;
+                    command[2]=-2;
+                    command[3]=86;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=10;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=-2;
+                    command[1]=69;
+                    command[2]=-4;
+                    command[3]=86;
+                    command[4]=29;
+                    command[5]=-3;
+                    command[6]=7;
+                }
+                break;
+            case 5:
+                if(s == "up")
+                {
+                    command[0]=-10;
+                    command[1]=80;
+                    command[2]=0;
+                    command[3]=75;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=-4;
+                    command[1]=70;
+                    command[2]=-5;
+                    command[3]=76;
+                    command[4]=28;
+                    command[5]=-5;
+                    command[6]=-2;
+                }
+                break;
+            case 6:
+                if(s == "up")
+                {
+                    command[0]=-75;
+                    command[1]=71;
+                    command[2]=64;
+                    command[3]=44;
+                    command[4]=21;
+                    command[5]=-7;
+                    command[6]=-13;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=-63;
+                    command[1]=71;
+                    command[2]=63;
+                    command[3]=45;
+                    command[4]=15;
+                    command[5]=-17;
+                    command[6]=-12;
+                }
+                break;
+            case 7:
+                if(s == "up")
+                {
+                    command[0]=-23;
+                    command[1]=77;
+                    command[2]=6;
+                    command[3]=63;
+                    command[4]=25;
+                    command[5]=0;
+                    command[6]=-11;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=-24;
+                    command[1]=77;
+                    command[2]=6;
+                    command[3]=63;
+                    command[4]=26;
+                    command[5]=0;
+                    command[6]=-11;
+                }
+                break;
+            case 8:
+                if(s == "up")
+                {
+                    command[0]=-84;
+                    command[1]=65;
+                    command[2]=65;
+                    command[3]=26;
+                    command[4]=27;
+                    command[5]=-10;
+                    command[6]=-20;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=-73;
+                    command[1]=66;
+                    command[2]=68;
+                    command[3]=26;
+                    command[4]=18;
+                    command[5]=-18;
+                    command[6]=-20;
+                }
+                break;
+            case 9:
+                if(s == "up")
+                {
+                    command[0]=-42;
+                    command[1]=76;
+                    command[2]=20;
+                    command[3]=49;
+                    command[4]=29;
+                    command[5]=-2;
+                    command[6]=-20;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=-26;
+                    command[1]=75;
+                    command[2]=15;
+                    command[3]=49;
+                    command[4]=23;
+                    command[5]=-11;
+                    command[6]=-20;
+                }
+                break;
+            case 10:
+                if(s == "up")
+                {
+                    command[0]=-87;
+                    command[1]=59;
+                    command[2]=60;
+                    command[3]=16;
+                    command[4]=39;
+                    command[5]=-16;
+                    command[6]=-12;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=-77;
+                    command[1]=59;
+                    command[2]=57;
+                    command[3]=16;
+                    command[4]=36;
+                    command[5]=-19;
+                    command[6]=-12;
+                }
+                break;
+            case 11:
+                if(s == "up")
+                {
+                    command[0]=-64;
+                    command[1]=78;
+                    command[2]=47;
+                    command[3]=38;
+                    command[4]=24;
+                    command[5]=-8;
+                    command[6]=-20;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=-49;
+                    command[1]=78;
+                    command[2]=47;
+                    command[3]=38;
+                    command[4]=14;
+                    command[5]=-17;
+                    command[6]=-20;
+                }
+                break;
+        }
     }
 
     void goHome()
