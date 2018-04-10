@@ -49,6 +49,9 @@ protected:
     PolyDriver positionRight;
     IPositionControl *posRight;
 
+    PolyDriver positionLeft;
+    IPositionControl *posLeft;
+
     //motor movement
     PolyDriver robotDevice;
     IPositionControl *movePos;
@@ -123,7 +126,7 @@ public:
         remotePorts+=robotName;
         remotePorts+="/right_arm";
 
-        std::string localPorts="/test/client";
+        std::string localPorts="/test/clientRight";
 
         Property options;
         options.put("device", "remote_controlboard");
@@ -131,15 +134,15 @@ public:
         options.put("remote", remotePorts.c_str());         //where we connect to
 
         // create a device
-        if (!robotDevice.open(options)) {
+        if (!positionRight.open(options)) {
             printf("Device not available.  Here are the known devices:\n");
             printf("%s", Drivers::factory().toString().c_str());
             return 0;
         }
 
         bool ok;
-        ok = robotDevice.view(movePos);
-        ok = ok && robotDevice.view(moveEncs);
+        ok = positionRight.view(posRight);
+        ok = ok && positionRight.view(moveEncs);
 
         if (!ok) {
             printf("Problems acquiring interfaces\n");
@@ -150,7 +153,7 @@ public:
             return false;
 
         int nj=0;
-        movePos->getAxes(&nj);
+        posRight->getAxes(&nj);
         Vector encoders;
         
         Vector tmp;
@@ -162,11 +165,11 @@ public:
         for (i = 0; i < nj; i++) {
              tmp[i] = 50.0;
         }
-        movePos->setRefAccelerations(tmp.data());
+        posRight->setRefAccelerations(tmp.data());
 
         for (i = 0; i < nj; i++) {
             tmp[i] = 10.0;
-            movePos->setRefSpeed(i, tmp[i]);
+            posRight->setRefSpeed(i, tmp[i]);
         }
 
         //pos->setRefSpeeds(tmp.data()))
@@ -185,7 +188,7 @@ public:
 
         command=encoders;
 
-        command[0]=-10;
+        command[0]=-11;
         command[1]=80;
         command[2]=0;
         command[3]=75;
@@ -193,26 +196,115 @@ public:
         command[5]=0;
         command[6]=0;
         //hand down position?
-        command[7]=60;
-        command[8]=19;
-        command[9]=40;
-        command[10]=1;
+        command[7]=38;
+        command[8]=4;
+        command[9]=48;
+        command[10]=55;
         command[11]=2;
         command[12]=10;
         command[13]=48;
         command[14]=0;
         command[15]=14;
-        movePos->positionMove(command.data());
+        posRight->positionMove(command.data());
         
         bool done=false;
 
         while(!done)
         {
-            movePos->checkMotionDone(&done);
+            posRight->checkMotionDone(&done);
             Time::delay(0.1);
         }
 
-        //robotDevice.close();
+        //positionRight.close();
+
+        //move left hand out of the way
+        std::string remotePorts2="/";
+        remotePorts2+=robotName;
+        remotePorts2+="/left_arm";
+
+        std::string localPorts2="/test/clientLeft";
+
+        Property options2;
+        options2.put("device", "remote_controlboard");
+        options2.put("local", localPorts2.c_str());   //local port names
+        options2.put("remote", remotePorts2.c_str());         //where we connect to
+
+        // create a device
+        if (!positionLeft.open(options2)) {
+            printf("Device not available.  Here are the known devices:\n");
+            printf("%s", Drivers::factory().toString().c_str());
+            return 0;
+        }
+
+        ok = positionLeft.view(posLeft);
+        ok = ok && positionLeft.view(moveEncs);
+
+        if (!ok) {
+            printf("Problems acquiring interfaces\n");
+            return 0;
+        }
+        
+        int nj2=0;
+        posLeft->getAxes(&nj2);
+        Vector encoders2;
+        
+        Vector tmp2;
+        encoders2.resize(nj2);
+        tmp2.resize(nj2);
+        command.resize(nj2);
+
+        for (i = 0; i < nj2; i++) {
+             tmp2[i] = 50.0;
+        }
+        posLeft->setRefAccelerations(tmp2.data());
+
+        for (i = 0; i < nj2; i++) {
+            tmp2[i] = 10.0;
+            posLeft->setRefSpeed(i, tmp2[i]);
+        }
+
+        //pos->setRefSpeeds(tmp.data()))
+        
+        //fisrst read all encoders
+        //
+        printf("waiting for encoders");
+        while(!moveEncs->getEncoders(encoders2.data()))
+        {
+            Time::delay(0.1);
+            printf(".");
+        }
+        printf("\n");
+
+        cout << "moving left hand out of the way..." << endl;
+
+        command=encoders2;
+
+        command[0]=0;
+        command[1]=25;
+        command[2]=0;
+        command[3]=30;
+        command[4]=0;
+        command[5]=0;
+        command[6]=0;
+        //hand down position?
+        command[7]=0;
+        command[8]=0;
+        command[9]=11;
+        command[10]=31;
+        command[11]=7;
+        command[12]=0;
+        command[13]=7;
+        command[14]=3;
+        command[15]=0;
+        posLeft->positionMove(command.data());
+        
+        done=false;
+
+        while(!done)
+        {
+            posLeft->checkMotionDone(&done);
+            Time::delay(0.1);
+        }
 
         // open the view
         client.view(icart);
@@ -292,7 +384,7 @@ public:
 
         //middle c caused last two notes to be unreachable?
         cout << "(Wait until finger movement is finished)" << endl;
-        cout << "Line up F with middle finger in this position. Enter any character to continue." << endl;
+        cout << "Line up A with middle finger in this position. Enter any character to continue." << endl;
         cout << "Table height is "  << tableHeight << "Z=0 around 65cm?" << endl;
         cin >> ack; 
         
@@ -305,6 +397,7 @@ public:
         //NOTE "y" is horizontal due to the setup. +y = move right from robot POV
         //-x = move forward from robot POV
         // -z = move down from robot POV
+        //TODO: Change these values
         //C
         x_notes[0]=home[0];
         y_notes[0]=home[1] - white_white_y * 3;
@@ -383,11 +476,7 @@ public:
         test[4]=7;
         test[5]=9;
         test[6]=11;
-        test[7]=10;
-        test[8]=8;
-        test[9]=6;
-        test[10]=3;
-        test[11]=1;
+
         t=Time::now();
 
         if(run_mode == 0)
@@ -425,39 +514,39 @@ public:
         {
             generateTarget(test[index], "up");
             cout << "Going to this note: " << test[index] << endl;
-            movePos->positionMove(command.data());
+            posRight->positionMove(command.data());
             
             bool done=false;
 
             while(!done)
             {
-                movePos->checkMotionDone(&done);
+                posRight->checkMotionDone(&done);
                 Time::delay(0.1);
             }
             cout << "Continue?" << endl;
             cin >> ack;
 
             generateTarget(test[index], "down");
-            movePos->positionMove(command.data());
+            posRight->positionMove(command.data());
             
             done=false;
 
             while(!done)
             {
-                movePos->checkMotionDone(&done);
+                posRight->checkMotionDone(&done);
                 Time::delay(0.1);
             }
             cout << "Continue?" << endl;
             cin >> ack;
 
             generateTarget(test[index], "up");
-            movePos->positionMove(command.data());
+            posRight->positionMove(command.data());
             
             done=false;
 
             while(!done)
             {
-                movePos->checkMotionDone(&done);
+                posRight->checkMotionDone(&done);
                 Time::delay(0.1);
             }
             cout << "Continue?" << endl;
@@ -505,26 +594,28 @@ public:
     {
         switch(i)
         {
+            //DONT USE FLATS
             case 0:
                 if(s == "up")
                 {
-                    command[0]=-20;
-                    command[1]=80;
-                    command[2]=17;
-                    command[3]=100;
+                    command[0]=-11;
+                    command[1]=72.5;
+                    command[2]=0;
+                    command[3]=75;
                     command[4]=20;
                     command[5]=0;
-                    command[6]=27;
+                    command[6]=0;
                 }
+
                 if(s == "down")
                 {
-                    command[0]=-8;
-                    command[1]=71;
-                    command[2]=9;
-                    command[3]=100;
-                    command[4]=29;
-                    command[5]=-2;
-                    command[6]=25;
+                    command[0]=-7;
+                    command[1]=72.5;
+                    command[2]=0;
+                    command[3]=75;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
                 }
                 break;
             case 1:
@@ -553,24 +644,24 @@ public:
             case 2:
                 if(s == "up")
                 {
-                    command[0]=-10;
-                    command[1]=80;
-                    command[2]=5;
-                    command[3]=93;
+                    command[0]=-11;
+                    command[1]=68;
+                    command[2]=0;
+                    command[3]=75;
                     command[4]=20;
                     command[5]=0;
-                    command[6]=19;
+                    command[6]=0;
                 }
 
                 if(s == "down")
                 {
-                    command[0]=-3;
-                    command[1]=70;
-                    command[2]=1;
-                    command[3]=94;
-                    command[4]=29;
-                    command[5]=-3;
-                    command[6]=16;
+                    command[0]=-7;
+                    command[1]=68;
+                    command[2]=0;
+                    command[3]=75;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
                 }
                 break;
             case 3:
@@ -599,31 +690,8 @@ public:
             case 4:
                 if(s == "up")
                 {
-                    command[0]=-6;
-                    command[1]=79;
-                    command[2]=-2;
-                    command[3]=86;
-                    command[4]=20;
-                    command[5]=0;
-                    command[6]=10;
-                }
-
-                if(s == "down")
-                {
-                    command[0]=-2;
-                    command[1]=69;
-                    command[2]=-4;
-                    command[3]=86;
-                    command[4]=29;
-                    command[5]=-3;
-                    command[6]=7;
-                }
-                break;
-            case 5:
-                if(s == "up")
-                {
-                    command[0]=-10;
-                    command[1]=80;
+                    command[0]=-11;
+                    command[1]=62;
                     command[2]=0;
                     command[3]=75;
                     command[4]=20;
@@ -633,13 +701,36 @@ public:
 
                 if(s == "down")
                 {
-                    command[0]=-4;
-                    command[1]=70;
-                    command[2]=-5;
-                    command[3]=76;
-                    command[4]=28;
-                    command[5]=-5;
-                    command[6]=-2;
+                    command[0]=-7;
+                    command[1]=62;
+                    command[2]=0;
+                    command[3]=75;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
+                }
+                break;
+            case 5:
+                if(s == "up")
+                {
+                    command[0]=-11;
+                    command[1]=57;
+                    command[2]=0;
+                    command[3]=75;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=-7;
+                    command[1]=57;
+                    command[2]=0;
+                    command[3]=75;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
                 }
                 break;
             case 6:
@@ -668,24 +759,24 @@ public:
             case 7:
                 if(s == "up")
                 {
-                    command[0]=-23;
-                    command[1]=77;
-                    command[2]=6;
-                    command[3]=63;
-                    command[4]=25;
+                    command[0]=-11;
+                    command[1]=52;
+                    command[2]=0;
+                    command[3]=75;
+                    command[4]=20;
                     command[5]=0;
-                    command[6]=-11;
+                    command[6]=0;
                 }
 
                 if(s == "down")
                 {
-                    command[0]=-24;
-                    command[1]=77;
-                    command[2]=6;
-                    command[3]=63;
-                    command[4]=26;
+                    command[0]=-7;
+                    command[1]=52;
+                    command[2]=0;
+                    command[3]=75;
+                    command[4]=20;
                     command[5]=0;
-                    command[6]=-11;
+                    command[6]=0;
                 }
                 break;
             case 8:
@@ -714,24 +805,24 @@ public:
             case 9:
                 if(s == "up")
                 {
-                    command[0]=-42;
-                    command[1]=76;
-                    command[2]=20;
-                    command[3]=49;
-                    command[4]=29;
-                    command[5]=-2;
-                    command[6]=-20;
+                    command[0]=-11;
+                    command[1]=80;
+                    command[2]=0;
+                    command[3]=75;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
                 }
 
                 if(s == "down")
                 {
-                    command[0]=-26;
-                    command[1]=75;
-                    command[2]=15;
-                    command[3]=49;
-                    command[4]=23;
-                    command[5]=-11;
-                    command[6]=-20;
+                    command[0]=-7;
+                    command[1]=80;
+                    command[2]=0;
+                    command[3]=75;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
                 }
                 break;
             case 10:
@@ -760,24 +851,24 @@ public:
             case 11:
                 if(s == "up")
                 {
-                    command[0]=-64;
-                    command[1]=78;
-                    command[2]=47;
-                    command[3]=38;
-                    command[4]=24;
-                    command[5]=-8;
-                    command[6]=-20;
+                    command[0]=-11;
+                    command[1]=76.5;
+                    command[2]=0;
+                    command[3]=75;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
                 }
 
                 if(s == "down")
                 {
-                    command[0]=-49;
-                    command[1]=78;
-                    command[2]=47;
-                    command[3]=38;
-                    command[4]=14;
-                    command[5]=-17;
-                    command[6]=-20;
+                    command[0]=-7;
+                    command[1]=76.5;
+                    command[2]=0;
+                    command[3]=75;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
                 }
                 break;
         }
