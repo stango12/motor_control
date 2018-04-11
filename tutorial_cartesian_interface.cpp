@@ -306,6 +306,16 @@ public:
             Time::delay(0.1);
         }
 
+        //back to finger down
+        command[7]=38;
+        command[8]=4;
+        command[9]=48;
+        command[10]=55;
+        command[11]=2;
+        command[12]=10;
+        command[13]=48;
+        command[14]=0;
+        command[15]=14;
         // open the view
         client.view(icart);
 
