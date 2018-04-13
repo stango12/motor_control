@@ -38,6 +38,7 @@ using namespace yarp::sig;
 using namespace yarp::math;
 using namespace iCub::iKin;
 
+
 class CtrlThread: public RateThread,
                   public CartesianEvent
 {
@@ -47,6 +48,9 @@ protected:
 
     PolyDriver positionRight;
     IPositionControl *posRight;
+
+    PolyDriver positionLeft;
+    IPositionControl *posLeft;
 
     //motor movement
     PolyDriver robotDevice;
@@ -61,7 +65,10 @@ protected:
     Vector x_notes;
     Vector y_notes;
 
+    Vector command;
+
     int startup_context_id;
+    int run_mode;
 
     double t;
     double t0;
@@ -127,15 +134,15 @@ public:
         options.put("remote", remotePorts.c_str());         //where we connect to
 
         // create a device
-        if (!robotDevice.open(options)) {
+        if (!positionRight.open(options)) {
             printf("Device not available.  Here are the known devices:\n");
             printf("%s", Drivers::factory().toString().c_str());
             return 0;
         }
 
         bool ok;
-        ok = robotDevice.view(movePos);
-        ok = ok && robotDevice.view(moveEncs);
+        ok = positionRight.view(posRight);
+        ok = ok && positionRight.view(moveEncs);
 
         if (!ok) {
             printf("Problems acquiring interfaces\n");
@@ -146,19 +153,23 @@ public:
             return false;
 
         int nj=0;
-        movePos->getAxes(&nj);
+        posRight->getAxes(&nj);
         Vector encoders;
-        Vector command;
+        
         Vector tmp;
         encoders.resize(nj);
         tmp.resize(nj);
         command.resize(nj);
         
         int i;
+        for (i = 0; i < nj; i++) {
+             tmp[i] = 50.0;
+        }
+        posRight->setRefAccelerations(tmp.data());
 
         for (i = 0; i < nj; i++) {
-            tmp[i] = 1.0;
-            movePos->setRefSpeed(i, tmp[i]);
+            tmp[i] = 10.0;
+            posRight->setRefSpeed(i, tmp[i]);
         }
 
         //pos->setRefSpeeds(tmp.data()))
@@ -177,7 +188,7 @@ public:
 
         command=encoders;
 
-        command[0]=-10;
+        command[0]=-9;
         command[1]=80;
         command[2]=0;
         command[3]=75;
@@ -185,27 +196,128 @@ public:
         command[5]=0;
         command[6]=0;
         //hand down position?
-        command[7]=60;
-        command[8]=19;
-        command[9]=40;
-        command[10]=1;
+        command[7]=38;
+        command[8]=4;
+        command[9]=48;
+        command[10]=55;
         command[11]=2;
         command[12]=10;
         command[13]=48;
         command[14]=0;
         command[15]=14;
-        movePos->positionMove(command.data());
+        posRight->positionMove(command.data());
         
         bool done=false;
 
         while(!done)
         {
-            movePos->checkMotionDone(&done);
+            posRight->checkMotionDone(&done);
             Time::delay(0.1);
         }
 
-        robotDevice.close();
+        //positionRight.close();
 
+        //move left hand out of the way
+        std::string remotePorts2="/";
+        remotePorts2+=robotName;
+        remotePorts2+="/left_arm";
+
+        std::string localPorts2="/test/clientLeft";
+
+        Property options2;
+        options2.put("device", "remote_controlboard");
+        options2.put("local", localPorts2.c_str());   //local port names
+        options2.put("remote", remotePorts2.c_str());         //where we connect to
+
+        // create a device
+        if (!positionLeft.open(options2)) {
+            printf("Device not available.  Here are the known devices:\n");
+            printf("%s", Drivers::factory().toString().c_str());
+            return 0;
+        }
+
+        ok = positionLeft.view(posLeft);
+        ok = ok && positionLeft.view(moveEncs);
+
+        if (!ok) {
+            printf("Problems acquiring interfaces\n");
+            return 0;
+        }
+        
+        int nj2=0;
+        posLeft->getAxes(&nj2);
+        Vector encoders2;
+        
+        Vector tmp2;
+        encoders2.resize(nj2);
+        tmp2.resize(nj2);
+        command.resize(nj2);
+
+        for (i = 0; i < nj2; i++) {
+             tmp2[i] = 50.0;
+        }
+        posLeft->setRefAccelerations(tmp2.data());
+
+        for (i = 0; i < nj2; i++) {
+            tmp2[i] = 10.0;
+            posLeft->setRefSpeed(i, tmp2[i]);
+        }
+
+        //pos->setRefSpeeds(tmp.data()))
+        
+        //fisrst read all encoders
+        //
+        printf("waiting for encoders");
+        while(!moveEncs->getEncoders(encoders2.data()))
+        {
+            Time::delay(0.1);
+            printf(".");
+        }
+        printf("\n");
+
+		cout << "Right hand moved. Continue?" << endl;
+        cin >> ack;
+        cout << "moving left hand out of the way..." << endl;
+
+        command=encoders2;
+
+        command[0]=0;
+        command[1]=25;
+        command[2]=0;
+        command[3]=30;
+        command[4]=0;
+        command[5]=0;
+        command[6]=0;
+        //hand down position?
+        command[7]=0;
+        command[8]=0;
+        command[9]=11;
+        command[10]=31;
+        command[11]=7;
+        command[12]=0;
+        command[13]=7;
+        command[14]=3;
+        command[15]=0;
+        posLeft->positionMove(command.data());
+        
+        done=false;
+
+        while(!done)
+        {
+            posLeft->checkMotionDone(&done);
+            Time::delay(0.1);
+        }
+
+        //back to finger down
+        command[7]=38;
+        command[8]=4;
+        command[9]=48;
+        command[10]=55;
+        command[11]=2;
+        command[12]=10;
+        command[13]=48;
+        command[14]=0;
+        command[15]=14;
         // open the view
         client.view(icart);
 
@@ -247,6 +359,7 @@ public:
         // register the event, attaching the callback
         icart->registerEvent(*this);
 
+		/*
         iCubFinger finger("right_middle");
         int nEncs;
         moveEncs->getAxes(&nEncs);
@@ -258,8 +371,9 @@ public:
         Matrix tipFrame=finger.getH((M_PI/180.0)*joints);
 
         Vector tip_x=tipFrame.getCol(3);
-        Vector tip_o=iCub::ctrl::dcm2axis(tipFrame);
+        Vector tip_o=dcm2axis(tipFrame);
         icart->attachTipFrame(tip_x,tip_o);
+        */
 
         xd.resize(3);
         od.resize(4);
@@ -269,12 +383,14 @@ public:
         y_notes.resize(12);
 
         icart->getPose(home, home_od);
+        fprintf(stdout,"home position = %s\n",home.toString().c_str());
+        fprintf(stdout,"home angle = %s\n",home_od.toString().c_str());
 
         // home[0]=-0.25;
         // home[1]=0.2;
         // home[2]=+0.2;
 
-        tableHeight = 0.1;
+        tableHeight = 0.16;
 
         // goHome();
         // icart->goToPoseSync(xd,od);
@@ -282,7 +398,8 @@ public:
 
         //middle c caused last two notes to be unreachable?
         cout << "(Wait until finger movement is finished)" << endl;
-        cout << "Line up F with middle finger in this position. Enter any character to continue." << endl;
+        cout << "Line up A with middle finger in this position. Enter any character to continue." << endl;
+        cout << "Table height is "  << tableHeight << "Z=0 around 65cm?" << endl;
         cin >> ack; 
         
         white_white_y=0.0225;
@@ -294,6 +411,7 @@ public:
         //NOTE "y" is horizontal due to the setup. +y = move right from robot POV
         //-x = move forward from robot POV
         // -z = move down from robot POV
+        //TODO: Change these values
         //C
         x_notes[0]=home[0];
         y_notes[0]=home[1] - white_white_y * 3;
@@ -343,6 +461,10 @@ public:
         y_notes[11]=y_notes[10] + small_white_black_y;
 
         index = 0;
+
+        cout << "Run runmode 0(Cartesian) or 1(Motor)?" << endl;
+        cin >> ack;
+        run_mode = ack - '0';
         return true;
     }
 
@@ -361,60 +483,91 @@ public:
         Vector xdhat,odhat,armPos;
         Vector test;
         test.resize(12);
-        test[0]=0;
-        test[1]=2;
-        test[2]=4;
-        test[3]=5;
-        test[4]=7;
-        test[5]=9;
-        test[6]=11;
-        test[7]=10;
-        test[8]=8;
-        test[9]=6;
-        test[10]=3;
-        test[11]=1;
+        test[0]=9;
+        test[1]=11;
+        test[2]=0;
+        test[3]=2;
+        test[4]=4;
+        test[5]=5;
+        test[6]=7;
+
         t=Time::now();
 
-        generateTarget(test[index]);
+        if(run_mode == 0)
+        {
+            generateTarget(test[index]);
 
-        // go to the target 
-        cout << "Going to this note: " << test[index] << endl;
-		icart->askForPose(xd,od, xdhat, odhat, armPos);
-        fprintf(stdout,"armPos = %s\n",armPos.toString().c_str());
-        cout << "Continue to move?" <<endl;
-        cin >> ack;
-        icart->goToPoseSync(xd,od);
-        icart->waitMotionDone(0.04);
+            // go to the target 
+            cout << "Going to this note: " << test[index] << endl;
+            icart->goToPoseSync(xd,od);
+            icart->waitMotionDone(0.04);
+            icart->askForPose(xd,od, xdhat, odhat, armPos);
+            fprintf(stdout,"armPos = %s\n",armPos.toString().c_str());
+            cout << "Continue?" << endl;
+            cin >> ack;
 
-        cout << "Continue?" << endl;
-        cin >> ack;
+            //go down
+            xd[2] = tableHeight;
+            icart->goToPoseSync(xd,od);
+            icart->waitMotionDone(0.04);
+            icart->askForPose(xd,od, xdhat, odhat, armPos);
+            fprintf(stdout,"armPos = %s\n",armPos.toString().c_str());
+            cout << "Continue?" << endl;
+            cin >> ack;
 
-        //go down
-        xd[2] = tableHeight;
-		icart->askForPose(xd,od, xdhat, odhat, armPos);
-        fprintf(stdout,"armPos = %s\n",armPos.toString().c_str());
-        cout << "Continue?" << endl;
-        cin >> ack;
-        icart->goToPoseSync(xd,od);
-        icart->waitMotionDone(0.04);
+            //back up
+            xd[2] = home[2];
+            icart->goToPoseSync(xd,od);
+            icart->waitMotionDone(0.04);
+            icart->askForPose(xd,od, xdhat, odhat, armPos);
+            fprintf(stdout,"armPos = %s\n",armPos.toString().c_str());
+            cout << "Continue?" << endl;
+            cin >> ack;
+        }
+        else
+        {
+            generateTarget(test[index], "up");
+            cout << "Going to this note: " << test[index] << endl;
+            posRight->positionMove(command.data());
+            
+            bool done=false;
 
-        cout << "Continue?" << endl;
-        cin >> ack;
+            while(!done)
+            {
+                posRight->checkMotionDone(&done);
+                Time::delay(0.1);
+            }
+            cout << "Continue?" << endl;
+            cin >> ack;
 
-        //back up
-        xd[2] = home[2];
-		icart->askForPose(xd,od, xdhat, odhat, armPos);
-        fprintf(stdout,"armPos = %s\n",armPos.toString().c_str());
-        cout << "Continue?" << endl;
-        cin >> ack;
-        icart->goToPoseSync(xd,od);
-        icart->waitMotionDone(0.04);
+            generateTarget(test[index], "down");
+            posRight->positionMove(command.data());
+            
+            done=false;
 
-        cout << "Continue?" << endl;
-        cin >> ack;
+            while(!done)
+            {
+                posRight->checkMotionDone(&done);
+                Time::delay(0.1);
+            }
+            cout << "Continue?" << endl;
+            cin >> ack;
 
+            generateTarget(test[index], "up");
+            posRight->positionMove(command.data());
+            
+            done=false;
+
+            while(!done)
+            {
+                posRight->checkMotionDone(&done);
+                Time::delay(0.1);
+            }
+            cout << "Continue?" << endl;
+            cin >> ack;
+        }
         index++;
-        if(index == 12)
+        if(index == test.size)
             index = 0;
 
         // some verbosity
@@ -449,6 +602,292 @@ public:
         // to achieve that it is enough to rotate the root frame of pi around z-axis
         //od[0]=0.0; od[1]=1.0; od[2]=0.0; od[3]=M_PI;
         od = home_od;
+    }
+
+    void generateTarget(int i, string s)
+    {
+		int up = -9;
+		int down = -4;
+        switch(i)
+        {
+            //DONT USE FLATS
+            case 0:
+                if(s == "up")
+                {
+                    command[0]=up;
+                    command[1]=80;
+                    command[2]=0;
+                    command[3]=67.5;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=down;
+                    command[1]=80;
+                    command[2]=0;
+                    command[3]=67.5;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
+                }
+                break;
+            case 1:
+                if(s == "up")
+                {
+                    command[0]=-62;
+                    command[1]=72;
+                    command[2]=58;
+                    command[3]=78;
+                    command[4]=22;
+                    command[5]=-2;
+                    command[6]=17;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=-52;
+                    command[1]=73;
+                    command[2]=59;
+                    command[3]=78;
+                    command[4]=22;
+                    command[5]=-13;
+                    command[6]=19;
+                }
+                break;
+            case 2:
+                if(s == "up")
+                {
+                    command[0]=up;
+                    command[1]=80;
+                    command[2]=0;
+                    command[3]=63;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=down;
+                    command[1]=80;
+                    command[2]=0;
+                    command[3]=63;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
+                }
+                break;
+            case 3:
+                if(s == "up")
+                {
+                    command[0]=-67;
+                    command[1]=74;
+                    command[2]=63;
+                    command[3]=67;
+                    command[4]=19;
+                    command[5]=-6;
+                    command[6]=7;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=-56;
+                    command[1]=75;
+                    command[2]=63;
+                    command[3]=68;
+                    command[4]=17;
+                    command[5]=-16;
+                    command[6]=8;   
+                }
+                break;
+            case 4:
+                if(s == "up")
+                {
+                    command[0]=up;
+                    command[1]=80;
+                    command[2]=0;
+                    command[3]=57;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=down;
+                    command[1]=80;
+                    command[2]=0;
+                    command[3]=57;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
+                }
+                break;
+            case 5:
+                if(s == "up")
+                {
+                    command[0]=up;
+                    command[1]=80;
+                    command[2]=0;
+                    command[3]=52;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=down;
+                    command[1]=80;
+                    command[2]=0;
+                    command[3]=52;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
+                }
+                break;
+            case 6:
+                if(s == "up")
+                {
+                    command[0]=-75;
+                    command[1]=71;
+                    command[2]=64;
+                    command[3]=44;
+                    command[4]=21;
+                    command[5]=-7;
+                    command[6]=-13;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=-63;
+                    command[1]=71;
+                    command[2]=63;
+                    command[3]=45;
+                    command[4]=15;
+                    command[5]=-17;
+                    command[6]=-12;
+                }
+                break;
+            case 7:
+                if(s == "up")
+                {
+                    command[0]=up;
+                    command[1]=80;
+                    command[2]=0;
+                    command[3]=47;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=down;
+                    command[1]=80;
+                    command[2]=0;
+                    command[3]=47;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
+                }
+                break;
+            case 8:
+                if(s == "up")
+                {
+                    command[0]=-84;
+                    command[1]=65;
+                    command[2]=65;
+                    command[3]=26;
+                    command[4]=27;
+                    command[5]=-10;
+                    command[6]=-20;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=-73;
+                    command[1]=66;
+                    command[2]=68;
+                    command[3]=26;
+                    command[4]=18;
+                    command[5]=-18;
+                    command[6]=-20;
+                }
+                break;
+            case 9:
+                if(s == "up")
+                {
+                    command[0]=up;
+                    command[1]=80;
+                    command[2]=0;
+                    command[3]=75;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=down;
+                    command[1]=80;
+                    command[2]=0;
+                    command[3]=75;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
+                }
+                break;
+            case 10:
+                if(s == "up")
+                {
+                    command[0]=-87;
+                    command[1]=59;
+                    command[2]=60;
+                    command[3]=16;
+                    command[4]=39;
+                    command[5]=-16;
+                    command[6]=-12;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=-77;
+                    command[1]=59;
+                    command[2]=57;
+                    command[3]=16;
+                    command[4]=36;
+                    command[5]=-19;
+                    command[6]=-12;
+                }
+                break;
+            case 11:
+                if(s == "up")
+                {
+                    command[0]=up;
+                    command[1]=80;
+                    command[2]=0;
+                    command[3]=71.5;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
+                }
+
+                if(s == "down")
+                {
+                    command[0]=down;
+                    command[1]=80;
+                    command[2]=0;
+                    command[3]=71.5;
+                    command[4]=20;
+                    command[5]=0;
+                    command[6]=0;
+                }
+                break;
+        }
     }
 
     void goHome()
@@ -529,7 +968,7 @@ public:
 
 YARP_DECLARE_DEVICES(icubmod) int main()
 {
-    YARP_REGISTER_DEVICES(icubmod);
+	YARP_REGISTER_DEVICES(icubmod);
     Network yarp;
     if (!yarp.checkNetwork())
     {
