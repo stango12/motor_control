@@ -10,6 +10,8 @@
 #include <cstdio>
 #include <cmath>
 #include <iostream>
+#include <stdexcept>
+#include <stdio.h>
 #include <string>
 
 #include <yarp/os/Network.h>
@@ -38,6 +40,7 @@ using namespace yarp::sig;
 using namespace yarp::math;
 using namespace iCub::iKin;
 
+Vector next_note;
 
 class CtrlThread: public RateThread,
                   public CartesianEvent
@@ -478,14 +481,8 @@ public:
     {
         Vector xdhat,odhat,armPos;
         Vector test;
-        test.resize(12);
-        test[0]=0;
-        test[1]=2;
-        test[2]=4;
-        test[3]=5;
-        test[4]=7;
-        test[5]=9;
-        test[6]=11;
+        test.resize(next_note.size());
+        test = next_note;
 
         t=Time::now();
 
@@ -524,6 +521,8 @@ public:
         {
             generateTarget(test[index], "up");
             cout << "Going to this note: " << test[index] << endl;
+            cin >> ack;
+
             posRight->positionMove(command.data());
             
             bool done=false;
@@ -563,7 +562,7 @@ public:
             cin >> ack;
         }
         index++;
-        if(index == 12)
+        if(index >= next_note.size())
             index = 0;
 
         // some verbosity
@@ -602,16 +601,18 @@ public:
 
     void generateTarget(int i, string s)
     {
+        int up = -9;
+        int down = -4;
         switch(i)
         {
             //DONT USE FLATS
             case 0:
                 if(s == "up")
                 {
-                    command[0]=-11;
-                    command[1]=72.5;
+                    command[0]=up;
+                    command[1]=80;
                     command[2]=0;
-                    command[3]=75;
+                    command[3]=67.5;
                     command[4]=20;
                     command[5]=0;
                     command[6]=0;
@@ -619,10 +620,10 @@ public:
 
                 if(s == "down")
                 {
-                    command[0]=-7;
-                    command[1]=72.5;
+                    command[0]=down;
+                    command[1]=80;
                     command[2]=0;
-                    command[3]=75;
+                    command[3]=67.5;
                     command[4]=20;
                     command[5]=0;
                     command[6]=0;
@@ -654,10 +655,10 @@ public:
             case 2:
                 if(s == "up")
                 {
-                    command[0]=-11;
-                    command[1]=68;
+                    command[0]=up;
+                    command[1]=80;
                     command[2]=0;
-                    command[3]=75;
+                    command[3]=63;
                     command[4]=20;
                     command[5]=0;
                     command[6]=0;
@@ -665,10 +666,10 @@ public:
 
                 if(s == "down")
                 {
-                    command[0]=-7;
-                    command[1]=68;
+                    command[0]=down;
+                    command[1]=80;
                     command[2]=0;
-                    command[3]=75;
+                    command[3]=63;
                     command[4]=20;
                     command[5]=0;
                     command[6]=0;
@@ -700,10 +701,10 @@ public:
             case 4:
                 if(s == "up")
                 {
-                    command[0]=-11;
-                    command[1]=62;
+                    command[0]=up;
+                    command[1]=80;
                     command[2]=0;
-                    command[3]=75;
+                    command[3]=57;
                     command[4]=20;
                     command[5]=0;
                     command[6]=0;
@@ -711,10 +712,10 @@ public:
 
                 if(s == "down")
                 {
-                    command[0]=-7;
-                    command[1]=62;
+                    command[0]=down;
+                    command[1]=80;
                     command[2]=0;
-                    command[3]=75;
+                    command[3]=57;
                     command[4]=20;
                     command[5]=0;
                     command[6]=0;
@@ -723,10 +724,10 @@ public:
             case 5:
                 if(s == "up")
                 {
-                    command[0]=-11;
-                    command[1]=57;
+                    command[0]=up;
+                    command[1]=80;
                     command[2]=0;
-                    command[3]=75;
+                    command[3]=52;
                     command[4]=20;
                     command[5]=0;
                     command[6]=0;
@@ -734,10 +735,10 @@ public:
 
                 if(s == "down")
                 {
-                    command[0]=-7;
-                    command[1]=57;
+                    command[0]=down;
+                    command[1]=80;
                     command[2]=0;
-                    command[3]=75;
+                    command[3]=52;
                     command[4]=20;
                     command[5]=0;
                     command[6]=0;
@@ -769,10 +770,10 @@ public:
             case 7:
                 if(s == "up")
                 {
-                    command[0]=-11;
-                    command[1]=52;
+                    command[0]=up;
+                    command[1]=80;
                     command[2]=0;
-                    command[3]=75;
+                    command[3]=47;
                     command[4]=20;
                     command[5]=0;
                     command[6]=0;
@@ -780,10 +781,10 @@ public:
 
                 if(s == "down")
                 {
-                    command[0]=-7;
-                    command[1]=52;
+                    command[0]=down;
+                    command[1]=80;
                     command[2]=0;
-                    command[3]=75;
+                    command[3]=47;
                     command[4]=20;
                     command[5]=0;
                     command[6]=0;
@@ -815,7 +816,7 @@ public:
             case 9:
                 if(s == "up")
                 {
-                    command[0]=-11;
+                    command[0]=up;
                     command[1]=80;
                     command[2]=0;
                     command[3]=75;
@@ -826,7 +827,7 @@ public:
 
                 if(s == "down")
                 {
-                    command[0]=-7;
+                    command[0]=down;
                     command[1]=80;
                     command[2]=0;
                     command[3]=75;
@@ -861,10 +862,10 @@ public:
             case 11:
                 if(s == "up")
                 {
-                    command[0]=-11;
-                    command[1]=76.5;
+                    command[0]=up;
+                    command[1]=80;
                     command[2]=0;
-                    command[3]=75;
+                    command[3]=71.5;
                     command[4]=20;
                     command[5]=0;
                     command[6]=0;
@@ -872,17 +873,17 @@ public:
 
                 if(s == "down")
                 {
-                    command[0]=-7;
-                    command[1]=76.5;
+                    command[0]=down;
+                    command[1]=80;
                     command[2]=0;
-                    command[3]=75;
+                    command[3]=71.5;
                     command[4]=20;
                     command[5]=0;
                     command[6]=0;
                 }
                 break;
         }
-    }
+}
 
     void goHome()
     {
@@ -958,10 +959,47 @@ public:
     virtual bool   updateModule() { return true; }
 };
 
+std::string exec(const char* cmd) {
+    char buffer[128];
+    std::string result = "";
+    FILE* pipe = popen(cmd, "r");
+    if (!pipe) throw std::runtime_error("popen() failed!");
+    try {
+        while (!feof(pipe)) {
+            if (fgets(buffer, 128, pipe) != NULL)
+                result += buffer;
+        }
+    } catch (...) {
+        pclose(pipe);
+        throw;
+    }
 
+    pclose(pipe);
+    return result;
+}
 
 int main()
 {
+    std::string res = exec("./call_python");
+    std::cout << res << std::endl;
+    next_note.resize(res.length()/2);
+    int i = 0;
+    int j = 0;
+    int num = 0;
+    for(i = 0; i < res.length(); i++)
+    {
+        if(isdigit(res[i]))
+        {
+            num *= 10;
+            num += res[i] - '0';
+        }
+        else
+        {
+            next_note[j] = num;
+            j++;
+            num = 0;
+        }
+    }
     Network yarp;
     if (!yarp.checkNetwork())
     {
